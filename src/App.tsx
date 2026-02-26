@@ -24,6 +24,7 @@ const INITIAL_DATA: FinancialData = {
   assets: {
     fourOhOneK: 250000,
     ira: 50000,
+    savings: 25000,
     other: 0
   },
   lastUpdated: new Date().toISOString()
@@ -271,17 +272,17 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label>401K Assets</label>
-            <input
-              type="number"
-              value={data.assets.fourOhOneK}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => updateField('assets.fourOhOneK', e.target.value)}
-            />
-          </div>
-          <div className="flex-between" style={{ gap: '1rem' }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label>401K Assets</label>
+              <input
+                type="number"
+                value={data.assets.fourOhOneK}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => updateField('assets.fourOhOneK', e.target.value)}
+              />
+            </div>
+            <div>
               <label>IRA Assets</label>
               <input
                 type="number"
@@ -290,7 +291,19 @@ function App() {
                 onChange={(e) => updateField('assets.ira', e.target.value)}
               />
             </div>
-            <div style={{ flex: 1 }}>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label>Cash Savings</label>
+              <input
+                type="number"
+                value={data.assets.savings}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => updateField('assets.savings', e.target.value)}
+              />
+            </div>
+            <div>
               <label>SSA / Mo</label>
               <input
                 type="number"

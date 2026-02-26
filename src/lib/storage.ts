@@ -14,6 +14,7 @@ export interface FinancialData {
   assets: {
     fourOhOneK: number;
     ira: number;
+    savings: number;
     other: number;
   };
   lastUpdated: string;
