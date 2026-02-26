@@ -9,7 +9,7 @@ import { storage } from './lib/storage';
 import type { FinancialData } from './lib/storage';
 
 const INITIAL_DATA: FinancialData = {
-  age: 45,
+  age: 65,
   retirementAge: 65,
   expectedLife: 90,
   ssaClaimingAge: 67,
@@ -54,6 +54,12 @@ function App() {
   useEffect(() => {
     storage.save(data);
   }, [data]);
+
+  // Reset SSA Claiming Age when Current Age changes
+  useEffect(() => {
+    const validAge = Math.max(62, Math.min(70, Math.floor(data.age)));
+    setData(prev => ({ ...prev, ssaClaimingAge: validAge }));
+  }, [data.age]);
 
   const closeSplash = () => {
     setShowSplash(false);
