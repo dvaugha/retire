@@ -14,6 +14,8 @@ const INITIAL_DATA: FinancialData = {
   expectedLife: 90,
   ssaMonthly: 2500,
   monthlyBudget: 5000,
+  monthlyWithdrawal: 3000,
+  taxRate: 12,
   roiScenarios: {
     low: 3,
     mid: 5,
@@ -44,17 +46,18 @@ function App() {
     storage.save(data);
   }, [data]);
 
-  const updateField = (path: string, value: number) => {
+  const updateField = (path: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
     const newData = { ...data };
     if (path.includes('.')) {
       const parts = path.split('.');
       const parent = parts[0] as keyof FinancialData;
       const child = parts[1] as string;
       // @ts-ignore
-      newData[parent][child] = value;
+      newData[parent][child] = numValue;
     } else {
       // @ts-ignore
-      newData[path] = value;
+      newData[path] = numValue;
     }
     newData.lastUpdated = new Date().toISOString();
     setData(newData);
@@ -63,27 +66,29 @@ function App() {
   const totalAssets = Object.values(data.assets).reduce((a, b) => a + b, 0);
   const yearsToRetire = Math.max(0, data.retirementAge - data.age);
 
+  // Calculate net withdrawal after tax
+  const netWithdrawal = data.monthlyWithdrawal * (1 - (data.taxRate / 100));
+  const totalMonthlyIncome = data.ssaMonthly + netWithdrawal;
+
   // Calculate runway for each scenario
   const calculateRunway = (roi: number) => {
-    let assets = totalAssets;
-    const monthlySsa = data.ssaMonthly;
-    const monthlyExp = data.monthlyBudget;
+    let currentAssets = totalAssets;
     const annualRoi = roi / 100;
+    const annualWithdrawal = data.monthlyWithdrawal * 12; // Gross withdrawal
 
-    // Simple projection: Compound until retirement, then draw down
     // 1. Accumulation phase
     for (let i = 0; i < yearsToRetire; i++) {
-      assets = assets * (1 + (annualRoi || 0));
+      currentAssets = currentAssets * (1 + annualRoi);
     }
 
     // 2. Withdrawal phase
-    let years = 0;
-    while (assets > 0 && years < 50) { // Cap at 50 years post-retire for safety
-      assets = (assets * (1 + (annualRoi || 0))) - ((monthlyExp - monthlySsa) * 12);
-      if (assets <= 0) break;
-      years++;
+    let yearsPostRetirement = 0;
+    while (currentAssets > 0 && yearsPostRetirement < 50) {
+      currentAssets = (currentAssets * (1 + annualRoi)) - annualWithdrawal;
+      if (currentAssets <= 0) break;
+      yearsPostRetirement++;
     }
-    return data.retirementAge + years;
+    return data.retirementAge + yearsPostRetirement;
   };
 
   const runwayLow = calculateRunway(data.roiScenarios.low);
@@ -113,7 +118,8 @@ function App() {
           <input
             type="number"
             value={data.age}
-            onChange={(e) => updateField('age', parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => updateField('age', e.target.value)}
           />
         </div>
         <div className="glass-card" style={{ padding: '1rem' }}>
@@ -121,10 +127,51 @@ function App() {
           <input
             type="number"
             value={data.expectedLife}
-            onChange={(e) => updateField('expectedLife', parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => updateField('expectedLife', e.target.value)}
           />
         </div>
       </div>
+
+      {/* Strategy Section */}
+      <section className="glass-card" style={{ border: '1px solid var(--accent-primary)' }}>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Withdrawal Strategy</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label>Invest. Withdrawal / Mo</label>
+            <input
+              type="number"
+              value={data.monthlyWithdrawal}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('monthlyWithdrawal', e.target.value)}
+            />
+          </div>
+          <div>
+            <label>Tax Rate (%)</label>
+            <input
+              type="number"
+              value={data.taxRate}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('taxRate', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+          <div className="flex-between" style={{ fontSize: '0.85rem' }}>
+            <span>Net Monthly Withdrawal</span>
+            <span style={{ fontWeight: 600 }}>${Math.floor(netWithdrawal).toLocaleString()}</span>
+          </div>
+          <div className="flex-between" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <span>+ Monthly SSA</span>
+            <span style={{ fontWeight: 600 }}>${data.ssaMonthly.toLocaleString()}</span>
+          </div>
+          <div className="flex-between" style={{ borderTop: '1px solid var(--border-glass)', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
+            <span style={{ fontWeight: 600 }}>Total Net Income</span>
+            <span className="text-gradient-green" style={{ fontWeight: 800 }}>${Math.floor(totalMonthlyIncome).toLocaleString()}</span>
+          </div>
+        </div>
+      </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="glass-card" style={{ padding: '1rem' }}>
@@ -132,15 +179,17 @@ function App() {
           <input
             type="number"
             value={data.retirementAge}
-            onChange={(e) => updateField('retirementAge', parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => updateField('retirementAge', e.target.value)}
           />
         </div>
         <div className="glass-card" style={{ padding: '1rem' }}>
-          <label>Monthly Budget</label>
+          <label>Target Budget</label>
           <input
             type="number"
             value={data.monthlyBudget}
-            onChange={(e) => updateField('monthlyBudget', parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => updateField('monthlyBudget', e.target.value)}
           />
         </div>
       </div>
@@ -154,7 +203,8 @@ function App() {
             <input
               type="number"
               value={data.roiScenarios.low}
-              onChange={(e) => updateField('roiScenarios.low', parseFloat(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('roiScenarios.low', e.target.value)}
             />
           </div>
           <div>
@@ -162,7 +212,8 @@ function App() {
             <input
               type="number"
               value={data.roiScenarios.mid}
-              onChange={(e) => updateField('roiScenarios.mid', parseFloat(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('roiScenarios.mid', e.target.value)}
             />
           </div>
           <div>
@@ -170,7 +221,8 @@ function App() {
             <input
               type="number"
               value={data.roiScenarios.high}
-              onChange={(e) => updateField('roiScenarios.high', parseFloat(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('roiScenarios.high', e.target.value)}
             />
           </div>
         </div>
@@ -224,7 +276,8 @@ function App() {
             <input
               type="number"
               value={data.assets.fourOhOneK}
-              onChange={(e) => updateField('assets.fourOhOneK', parseInt(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => updateField('assets.fourOhOneK', e.target.value)}
             />
           </div>
           <div className="flex-between" style={{ gap: '1rem' }}>
@@ -233,7 +286,8 @@ function App() {
               <input
                 type="number"
                 value={data.assets.ira}
-                onChange={(e) => updateField('assets.ira', parseInt(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => updateField('assets.ira', e.target.value)}
               />
             </div>
             <div style={{ flex: 1 }}>
@@ -241,7 +295,8 @@ function App() {
               <input
                 type="number"
                 value={data.ssaMonthly}
-                onChange={(e) => updateField('ssaMonthly', parseInt(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => updateField('ssaMonthly', e.target.value)}
               />
             </div>
           </div>

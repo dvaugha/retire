@@ -4,6 +4,8 @@ export interface FinancialData {
   expectedLife: number;
   ssaMonthly: number;
   monthlyBudget: number;
+  monthlyWithdrawal: number;
+  taxRate: number;
   roiScenarios: {
     low: number;
     mid: number;
