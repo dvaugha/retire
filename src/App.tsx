@@ -138,6 +138,37 @@ function App() {
   const runwayMid = calculateRunway(data.roiScenarios.mid);
   const runwayHigh = calculateRunway(data.roiScenarios.high);
 
+  // Calculate Ending Nest Egg (Balance at expectedLife based on MID return)
+  const calculateEndingBalance = () => {
+    let currentAssets = totalAssets;
+    const annualRoi = data.roiScenarios.mid / 100;
+    const annualInflation = data.inflationRate / 100;
+    let annualWithdrawal = data.monthlyWithdrawal * 12;
+
+    // 1. Accumulation phase (today until retirement)
+    for (let i = 0; i < Math.max(0, data.retirementAge - data.age); i++) {
+      currentAssets = currentAssets * (1 + annualRoi);
+      annualWithdrawal = annualWithdrawal * (1 + annualInflation);
+    }
+
+    // 2. Withdrawal phase (until expectedLife)
+    const yearsToCalculate = data.expectedLife - data.retirementAge;
+    for (let i = 0; i < yearsToCalculate; i++) {
+      const currentAge = data.retirementAge + i;
+      let ssaIncome = 0;
+      if (currentAge >= data.ssaClaimingAge) {
+        const yearsOfCola = currentAge - data.age;
+        ssaIncome = currentSsaCheck * 12 * Math.pow(1 + annualInflation, yearsOfCola);
+      }
+      currentAssets = (currentAssets * (1 + annualRoi)) + ssaIncome - annualWithdrawal;
+      annualWithdrawal = annualWithdrawal * (1 + annualInflation);
+      if (currentAssets < 0) return 0;
+    }
+    return Math.max(0, currentAssets);
+  };
+
+  const endingBalance = calculateEndingBalance();
+
   // Cumulative Cash Logic for SSA Strategy Lab
   const calculateCumulativeCash = (claimingAge: number, endAge: number) => {
     let total = 0;
@@ -417,11 +448,20 @@ function App() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-glass)' }}>
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div className="flex-between">
-              <span style={{ fontWeight: 600 }}>Total Nest Egg</span>
+              <span style={{ fontWeight: 600 }}>Current Nest Egg</span>
               <span className="text-gradient-green" style={{ fontSize: '1.25rem', fontWeight: 800 }}>
                 ${totalAssets.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex-between" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginTop: '0.25rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Ending Nest Egg (Age {data.expectedLife})</span>
+              <span style={{
+                fontWeight: 700,
+                color: endingBalance > 0 ? 'var(--accent-secondary)' : '#f87171'
+              }}>
+                ${Math.floor(endingBalance).toLocaleString()}
               </span>
             </div>
           </div>
