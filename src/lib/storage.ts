@@ -17,6 +17,8 @@ export interface FinancialData {
     savings: number;
     other: number;
   };
+  inflationRate: number;
+  hasSeenSplash: boolean;
   lastUpdated: string;
 }
 
