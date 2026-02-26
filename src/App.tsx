@@ -176,7 +176,6 @@ function App() {
 
   const catchupAge = findBreakEven();
   const forgoneIncome = calculateCumulativeCash(nowAge, waitAge);
-  const lifetimeBonus = calculateCumulativeCash(waitAge, data.expectedLife) - calculateCumulativeCash(nowAge, data.expectedLife);
   const isWorthIt = data.expectedLife > (catchupAge || 0);
 
   return (
@@ -459,27 +458,37 @@ function App() {
                 <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
                   <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>INCOME FORGONE</label>
                   <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171' }}>-${Math.floor(forgoneIncome).toLocaleString()}</span>
-                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>While waiting to reach {waitAge}</p>
+                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>Sacrificed cash today</p>
                 </div>
                 <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
                   <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CATCH-UP AGE</label>
                   <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fbbf24' }}>{catchupAge}</span>
-                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>When the wait pays off</p>
+                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>When delay "pays off"</p>
                 </div>
               </div>
 
+              {/* REALITY CHECK SECTION */}
+              <div style={{ padding: '1rem', border: '1px dashed #f87171', borderRadius: '12px', marginBottom: '1.5rem', background: 'rgba(248, 113, 113, 0.05)' }}>
+                <h3 style={{ fontSize: '0.8rem', color: '#f87171', marginBottom: '0.5rem', fontWeight: 700 }}>⚠️ THE REALITY CHECK</h3>
+                <ul style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <li><strong>Utility of Money:</strong> Is an extra check at age {catchupAge}+ more valuable than travel/hobbies at age {nowAge}?</li>
+                  <li><strong>Solvency Risk:</strong> Federal policy could change. A "bird in hand" today is 100% guaranteed.</li>
+                  <li><strong>Active Years:</strong> Medical costs rise later, but "Active Lifestyle" spending usually peaks before age 80.</li>
+                </ul>
+              </div>
+
               <div style={{ padding: '1.25rem', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', borderLeft: `4px solid ${isWorthIt ? 'var(--accent-secondary)' : '#f87171'}` }}>
-                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>The Verdict:</h3>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>The Trade-Off Analysis:</h3>
                 <p style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
                   {isWorthIt ? (
                     <>
-                      By waiting until <strong style={{ color: 'white' }}>{waitAge}</strong>, you will have more total lifetime cash after <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
-                      Since you expect to live to {data.expectedLife}, waiting is worth an extra <strong style={{ color: 'var(--accent-secondary)' }}>${Math.floor(lifetimeBonus).toLocaleString()}</strong>.
+                      Purely by the math, waiting starts to pay off after <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
+                      However, to get that "bonus," you must walk away from <strong style={{ color: '#f87171' }}>${Math.floor(forgoneIncome).toLocaleString()}</strong> in liquid cash during your most active years.
                     </>
                   ) : (
                     <>
-                      You won't break even until <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
-                      Since your life expectancy is {data.expectedLife}, you are likely better off <strong style={{ color: '#f87171' }}>taking benefits now</strong> and enjoying the cash.
+                      The math is clear: You won't break even until <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
+                      Since your longevity estimate is {data.expectedLife}, <strong style={{ color: 'var(--accent-secondary)' }}>taking benefits now</strong> is the smarter mathematical and lifestyle move.
                     </>
                   )}
                 </p>
@@ -492,7 +501,7 @@ function App() {
           )}
 
           <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            "Is an extra ${Math.floor(currentSsaCheck - (data.ssaMonthly * getSsaMultiplier(nowAge)))}/mo at age 85 worth giving up ${Math.floor(forgoneIncome).toLocaleString()} today?"
+            "You can't buy back your 60s with an extra check in your 80s."
           </div>
         </section>
 
