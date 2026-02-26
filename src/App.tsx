@@ -12,7 +12,8 @@ const INITIAL_DATA: FinancialData = {
   age: 45,
   retirementAge: 65,
   expectedLife: 90,
-  ssaMonthly: 2500,
+  ssaClaimingAge: 67,
+  ssaMonthly: 3000, // Base at age 67
   monthlyBudget: 5000,
   monthlyWithdrawal: 3000,
   taxRate: 12,
@@ -77,11 +78,17 @@ function App() {
   };
 
   const totalAssets = Object.values(data.assets).reduce((a, b) => a + b, 0);
-  const yearsToRetire = Math.max(0, data.retirementAge - data.age);
 
-  // Calculate net withdrawal after tax
+  // SSA Multiplier Logic
+  const getSsaMultiplier = (age: number) => {
+    if (age <= 62) return 0.70;
+    if (age >= 70) return 1.24;
+    if (age < 67) return 0.70 + (age - 62) * 0.06; // Approx 6% increase per year
+    return 1.00 + (age - 67) * 0.08; // Approx 8% increase per year
+  };
+
+  const currentSsaCheck = data.ssaMonthly * getSsaMultiplier(data.ssaClaimingAge);
   const netWithdrawal = data.monthlyWithdrawal * (1 - (data.taxRate / 100));
-  const totalMonthlyIncome = data.ssaMonthly + netWithdrawal;
 
   // Calculate runway for each scenario
   const calculateRunway = (roi: number) => {
@@ -90,18 +97,29 @@ function App() {
     const annualInflation = data.inflationRate / 100;
     let annualWithdrawal = data.monthlyWithdrawal * 12; // Gross withdrawal
 
-    // 1. Accumulation phase
-    for (let i = 0; i < yearsToRetire; i++) {
+    // 1. Accumulation phase (today until retirement)
+    for (let i = 0; i < (data.retirementAge - data.age); i++) {
       currentAssets = currentAssets * (1 + annualRoi);
-      // Inflation affects the target withdrawal amount during wait
+      // Expenses grow with inflation while waiting for retirement
       annualWithdrawal = annualWithdrawal * (1 + annualInflation);
     }
 
     // 2. Withdrawal phase
     let yearsPostRetirement = 0;
     while (currentAssets > 0 && yearsPostRetirement < 50) {
-      currentAssets = (currentAssets * (1 + annualRoi)) - annualWithdrawal;
-      // Budget continues to increase with inflation post-retirement
+      const currentAge = data.retirementAge + yearsPostRetirement;
+
+      // SSA only kicks in at Claiming Age
+      let ssaIncome = 0;
+      if (currentAge >= data.ssaClaimingAge) {
+        // SSA COLA: Start from today and compound based on inflation
+        const yearsOfCola = currentAge - data.age;
+        ssaIncome = currentSsaCheck * 12 * Math.pow(1 + annualInflation, yearsOfCola);
+      }
+
+      currentAssets = (currentAssets * (1 + annualRoi)) + ssaIncome - annualWithdrawal;
+
+      // Budget continues to increase with inflation
       annualWithdrawal = annualWithdrawal * (1 + annualInflation);
 
       if (currentAssets <= 0) break;
@@ -113,6 +131,23 @@ function App() {
   const runwayLow = calculateRunway(data.roiScenarios.low);
   const runwayMid = calculateRunway(data.roiScenarios.mid);
   const runwayHigh = calculateRunway(data.roiScenarios.high);
+
+  // Cumulative Cash Logic for SSA Strategy Lab
+  const calculateCumulativeCash = (claimingAge: number, endAge: number) => {
+    let total = 0;
+    const annualInflation = data.inflationRate / 100;
+    const baseCheck = data.ssaMonthly * getSsaMultiplier(claimingAge) * 12;
+
+    for (let age = claimingAge; age < endAge; age++) {
+      // SSA COLA is simplified here as compounding from 'today'
+      const yearCheck = baseCheck * Math.pow(1 + annualInflation, age - data.age);
+      total += yearCheck;
+    }
+    return total;
+  };
+
+  const cashAt75_Early = calculateCumulativeCash(62, 75);
+  const cashAt75_Wait = calculateCumulativeCash(70, 75);
 
   return (
     <>
@@ -184,11 +219,11 @@ function App() {
             </div>
             <div className="flex-between" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
               <span>+ Monthly SSA</span>
-              <span style={{ fontWeight: 600 }}>${data.ssaMonthly.toLocaleString()}</span>
+              <span style={{ fontWeight: 600 }}>${Math.floor(currentSsaCheck).toLocaleString()}</span>
             </div>
             <div className="flex-between" style={{ borderTop: '1px solid var(--border-glass)', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
               <span style={{ fontWeight: 600 }}>Total Net Income</span>
-              <span className="text-gradient-green" style={{ fontWeight: 800 }}>${Math.floor(totalMonthlyIncome).toLocaleString()}</span>
+              <span className="text-gradient-green" style={{ fontWeight: 800 }}>${Math.floor(netWithdrawal + currentSsaCheck).toLocaleString()}</span>
             </div>
           </div>
         </section>
@@ -336,7 +371,7 @@ function App() {
                 />
               </div>
               <div>
-                <label>SSA / Mo</label>
+                <label>SSA Base/Mo (67)</label>
                 <input
                   type="number"
                   value={data.ssaMonthly}
@@ -354,6 +389,65 @@ function App() {
                 ${totalAssets.toLocaleString()}
               </span>
             </div>
+          </div>
+        </section>
+
+        {/* SSA Strategy Lab */}
+        <section className="glass-card" style={{ border: '1px solid #c084fc', background: 'rgba(192, 132, 252, 0.05)' }}>
+          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+            <h2>SSA Strategy Lab</h2>
+            <div className="glass-card" style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.7rem', color: '#c084fc', border: '1px solid #c084fc' }}>
+              ROI Analysis
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
+              <label>Claiming Age: <span style={{ color: 'white', fontWeight: 800 }}>{data.ssaClaimingAge}</span></label>
+              <span className="text-gradient-blue" style={{ fontWeight: 700 }}>
+                ${Math.floor(currentSsaCheck).toLocaleString()}/mo
+              </span>
+            </div>
+            <input
+              type="range"
+              min="62"
+              max="70"
+              step="1"
+              value={data.ssaClaimingAge}
+              onChange={(e) => updateField('ssaClaimingAge', e.target.value)}
+              style={{ width: '100%', height: '8px', borderRadius: '4px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}
+            />
+            <div className="flex-between" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              <span>62 (Min)</span>
+              <span>67 (FRA)</span>
+              <span>70 (Max)</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+              <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CASH BY AGE 75 (EARLY)</label>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#f87171' }}>${Math.floor(cashAt75_Early).toLocaleString()}</span>
+              <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>Take at 62</p>
+            </div>
+            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+              <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CASH BY AGE 75 (WAIT)</label>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-secondary)' }}>${Math.floor(cashAt75_Wait).toLocaleString()}</span>
+              <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>Take at 70</p>
+            </div>
+          </div>
+
+          <div style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', fontSize: '0.85rem' }}>
+            <p style={{ marginBottom: '0.75rem', lineHeight: '1.4' }}>
+              🚨 <strong style={{ color: 'white' }}>Prime Years Analysis:</strong> By taking SSA at 62, you collect <strong style={{ color: '#fbbf24' }}>${Math.floor(cashAt75_Early - cashAt75_Wait).toLocaleString()} MORE</strong> in total cash before age 75.
+            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontStyle: 'italic' }}>
+              Is the extra $800/mo at age 80 worth giving up $150k+ while you can still travel and walk comfortably?
+            </p>
+          </div>
+
+          <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.7rem', color: '#c084fc' }}>
+            Break-even age if waiting: <strong>~79 Years Old</strong>
           </div>
         </section>
 

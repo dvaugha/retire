@@ -2,6 +2,7 @@ export interface FinancialData {
   age: number;
   retirementAge: number;
   expectedLife: number;
+  ssaClaimingAge: number;
   ssaMonthly: number;
   monthlyBudget: number;
   monthlyWithdrawal: number;
