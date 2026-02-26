@@ -146,8 +146,38 @@ function App() {
     return total;
   };
 
-  const cashAt75_Early = calculateCumulativeCash(62, 75);
-  const cashAt75_Wait = calculateCumulativeCash(70, 75);
+  // SSA Strategy Calculations
+  const nowAge = Math.max(62, data.age);
+  const waitAge = data.ssaClaimingAge;
+
+  // Calculate Break-Even
+  const findBreakEven = () => {
+    if (waitAge <= nowAge) return null;
+
+    let totalNow = 0;
+    let totalWait = 0;
+    const annualInflation = data.inflationRate / 100;
+    const checkNow = data.ssaMonthly * getSsaMultiplier(nowAge) * 12;
+    const checkWait = data.ssaMonthly * getSsaMultiplier(waitAge) * 12;
+
+    // Check every year until 100
+    for (let age = nowAge; age <= 100; age++) {
+      if (age < waitAge) {
+        totalNow += checkNow * Math.pow(1 + annualInflation, age - data.age);
+      } else {
+        totalNow += checkNow * Math.pow(1 + annualInflation, age - data.age);
+        totalWait += checkWait * Math.pow(1 + annualInflation, age - data.age);
+      }
+
+      if (totalWait > totalNow) return age;
+    }
+    return 100;
+  };
+
+  const catchupAge = findBreakEven();
+  const forgoneIncome = calculateCumulativeCash(nowAge, waitAge);
+  const lifetimeBonus = calculateCumulativeCash(waitAge, data.expectedLife) - calculateCumulativeCash(nowAge, data.expectedLife);
+  const isWorthIt = data.expectedLife > (catchupAge || 0);
 
   return (
     <>
@@ -190,7 +220,7 @@ function App() {
 
         {/* Strategy Section */}
         <section className="glass-card" style={{ border: '1px solid var(--accent-primary)' }}>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Withdrawal Strategy</h2>
+          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Monthly Strategy</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <label>Invest. Withdrawal / Mo</label>
@@ -218,7 +248,7 @@ function App() {
               <span style={{ fontWeight: 600 }}>${Math.floor(netWithdrawal).toLocaleString()}</span>
             </div>
             <div className="flex-between" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              <span>+ Monthly SSA</span>
+              <span>+ Monthly SSA Check</span>
               <span style={{ fontWeight: 600 }}>${Math.floor(currentSsaCheck).toLocaleString()}</span>
             </div>
             <div className="flex-between" style={{ borderTop: '1px solid var(--border-glass)', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
@@ -395,22 +425,22 @@ function App() {
         {/* SSA Strategy Lab */}
         <section className="glass-card" style={{ border: '1px solid #c084fc', background: 'rgba(192, 132, 252, 0.05)' }}>
           <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-            <h2>SSA Strategy Lab</h2>
+            <h2>SSA Break-Even Lab</h2>
             <div className="glass-card" style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.7rem', color: '#c084fc', border: '1px solid #c084fc' }}>
-              ROI Analysis
+              Is waiting worth it?
             </div>
           </div>
 
           <div style={{ marginBottom: '2rem' }}>
             <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
-              <label>Claiming Age: <span style={{ color: 'white', fontWeight: 800 }}>{data.ssaClaimingAge}</span></label>
+              <label>Waiting until Age: <span style={{ color: 'white', fontWeight: 800 }}>{data.ssaClaimingAge}</span></label>
               <span className="text-gradient-blue" style={{ fontWeight: 700 }}>
                 ${Math.floor(currentSsaCheck).toLocaleString()}/mo
               </span>
             </div>
             <input
               type="range"
-              min="62"
+              min={Math.max(62, Math.floor(data.age))}
               max="70"
               step="1"
               value={data.ssaClaimingAge}
@@ -418,36 +448,51 @@ function App() {
               style={{ width: '100%', height: '8px', borderRadius: '4px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}
             />
             <div className="flex-between" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              <span>62 (Min)</span>
-              <span>67 (FRA)</span>
+              <span>Now ({Math.max(62, Math.floor(data.age))})</span>
               <span>70 (Max)</span>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-              <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CASH BY AGE 75 (EARLY)</label>
-              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#f87171' }}>${Math.floor(cashAt75_Early).toLocaleString()}</span>
-              <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>Take at 62</p>
-            </div>
-            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-              <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CASH BY AGE 75 (WAIT)</label>
-              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-secondary)' }}>${Math.floor(cashAt75_Wait).toLocaleString()}</span>
-              <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>Take at 70</p>
-            </div>
-          </div>
+          {waitAge > nowAge ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                  <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>INCOME FORGONE</label>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171' }}>-${Math.floor(forgoneIncome).toLocaleString()}</span>
+                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>While waiting to reach {waitAge}</p>
+                </div>
+                <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                  <label style={{ fontSize: '0.65rem', display: 'block', marginBottom: '0.5rem' }}>CATCH-UP AGE</label>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fbbf24' }}>{catchupAge}</span>
+                  <p style={{ fontSize: '0.6rem', marginTop: '4px', color: 'var(--text-secondary)' }}>When the wait pays off</p>
+                </div>
+              </div>
 
-          <div style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', fontSize: '0.85rem' }}>
-            <p style={{ marginBottom: '0.75rem', lineHeight: '1.4' }}>
-              🚨 <strong style={{ color: 'white' }}>Prime Years Analysis:</strong> By taking SSA at 62, you collect <strong style={{ color: '#fbbf24' }}>${Math.floor(cashAt75_Early - cashAt75_Wait).toLocaleString()} MORE</strong> in total cash before age 75.
-            </p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontStyle: 'italic' }}>
-              Is the extra $800/mo at age 80 worth giving up $150k+ while you can still travel and walk comfortably?
-            </p>
-          </div>
+              <div style={{ padding: '1.25rem', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', borderLeft: `4px solid ${isWorthIt ? 'var(--accent-secondary)' : '#f87171'}` }}>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>The Verdict:</h3>
+                <p style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
+                  {isWorthIt ? (
+                    <>
+                      By waiting until <strong style={{ color: 'white' }}>{waitAge}</strong>, you will have more total lifetime cash after <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
+                      Since you expect to live to {data.expectedLife}, waiting is worth an extra <strong style={{ color: 'var(--accent-secondary)' }}>${Math.floor(lifetimeBonus).toLocaleString()}</strong>.
+                    </>
+                  ) : (
+                    <>
+                      You won't break even until <strong style={{ color: 'white' }}>age {catchupAge}</strong>.
+                      Since your life expectancy is {data.expectedLife}, you are likely better off <strong style={{ color: '#f87171' }}>taking benefits now</strong> and enjoying the cash.
+                    </>
+                  )}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1.5rem', opacity: 0.6 }}>
+              Move the slider to compare waiting for a higher check.
+            </div>
+          )}
 
-          <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.7rem', color: '#c084fc' }}>
-            Break-even age if waiting: <strong>~79 Years Old</strong>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            "Is an extra ${Math.floor(currentSsaCheck - (data.ssaMonthly * getSsaMultiplier(nowAge)))}/mo at age 85 worth giving up ${Math.floor(forgoneIncome).toLocaleString()} today?"
           </div>
         </section>
 
