@@ -1,7 +1,14 @@
 export interface FinancialData {
   age: number;
   retirementAge: number;
+  expectedLife: number;
   ssaMonthly: number;
+  monthlyBudget: number;
+  roiScenarios: {
+    low: number;
+    mid: number;
+    high: number;
+  };
   assets: {
     fourOhOneK: number;
     ira: number;
