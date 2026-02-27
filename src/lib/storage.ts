@@ -16,6 +16,13 @@ export interface FinancialData {
     fourOhOneK: number;
     ira: number;
     savings: number;
+    home: number;
+    car: number;
+    other: number;
+  };
+  liabilities: {
+    mortgage: number;
+    loans: number;
     other: number;
   };
   inflationRate: number;

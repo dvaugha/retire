@@ -26,6 +26,13 @@ const INITIAL_DATA: FinancialData = {
     fourOhOneK: 250000,
     ira: 50000,
     savings: 25000,
+    home: 0,
+    car: 0,
+    other: 0
+  },
+  liabilities: {
+    mortgage: 0,
+    loans: 0,
     other: 0
   },
   inflationRate: 3,
@@ -41,7 +48,13 @@ function App() {
   useEffect(() => {
     const saved = storage.load();
     if (saved) {
-      setData({ ...INITIAL_DATA, ...saved });
+      setData({
+        ...INITIAL_DATA,
+        ...saved,
+        assets: { ...INITIAL_DATA.assets, ...(saved.assets || {}) },
+        liabilities: { ...INITIAL_DATA.liabilities, ...(saved.liabilities || {}) },
+        roiScenarios: { ...INITIAL_DATA.roiScenarios, ...(saved.roiScenarios || {}) }
+      });
       if (!saved.hasSeenSplash) {
         setShowSplash(true);
       }
@@ -66,24 +79,36 @@ function App() {
     setData(prev => ({ ...prev, hasSeenSplash: true }));
   };
 
-  const updateField = (path: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    const newData = { ...data };
-    if (path.includes('.')) {
-      const parts = path.split('.');
-      const parent = parts[0] as keyof FinancialData;
-      const child = parts[1] as string;
-      // @ts-ignore
-      newData[parent][child] = numValue;
-    } else {
-      // @ts-ignore
-      newData[path] = numValue;
-    }
-    newData.lastUpdated = new Date().toISOString();
-    setData(newData);
+  const updateField = (path: string, value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+
+    setData(prev => {
+      const lastUpdated = new Date().toISOString();
+      if (path.includes('.')) {
+        const [parent, child] = path.split('.');
+        const parentKey = parent as keyof FinancialData;
+        return {
+          ...prev,
+          [parentKey]: {
+            ...(prev[parentKey] as object),
+            [child]: numValue
+          },
+          lastUpdated
+        };
+      }
+      return {
+        ...prev,
+        [path]: numValue,
+        lastUpdated
+      };
+    });
   };
 
+  // Calculate Totals
+  const investableAssets = data.assets.fourOhOneK + data.assets.ira + data.assets.savings + data.assets.other;
   const totalAssets = Object.values(data.assets).reduce((a, b) => a + b, 0);
+  const totalLiabilities = Object.values(data.liabilities).reduce((a, b) => a + b, 0);
+  const netWorth = totalAssets - totalLiabilities;
 
   // SSA Multiplier Logic
   const getSsaMultiplier = (age: number) => {
@@ -98,7 +123,7 @@ function App() {
 
   // Calculate runway for each scenario
   const calculateRunway = (roi: number) => {
-    let currentAssets = totalAssets;
+    let currentAssets = investableAssets;
     const annualRoi = roi / 100;
     const annualInflation = data.inflationRate / 100;
     let annualWithdrawal = data.monthlyWithdrawal * 12; // Gross withdrawal
@@ -140,7 +165,7 @@ function App() {
 
   // Calculate Ending Nest Egg (Balance at expectedLife based on MID return)
   const calculateEndingBalance = () => {
-    let currentAssets = totalAssets;
+    let currentAssets = investableAssets;
     const annualRoi = data.roiScenarios.mid / 100;
     const annualInflation = data.inflationRate / 100;
     let annualWithdrawal = data.monthlyWithdrawal * 12;
@@ -428,6 +453,27 @@ function App() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
+                <label>Home Value</label>
+                <input
+                  type="number"
+                  value={data.assets.home}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => updateField('assets.home', e.target.value)}
+                />
+              </div>
+              <div>
+                <label>Car Value</label>
+                <input
+                  type="number"
+                  value={data.assets.car}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => updateField('assets.car', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
                 <label>Cash Savings</label>
                 <input
                   type="number"
@@ -448,11 +494,48 @@ function App() {
             </div>
           </div>
 
+          {/* Liabilities Section */}
+          <div style={{ marginTop: '2rem' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#f87171' }}>Liabilities</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label>Mortgage</label>
+                <input
+                  type="number"
+                  value={data.liabilities.mortgage}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => updateField('liabilities.mortgage', e.target.value)}
+                />
+              </div>
+              <div>
+                <label>Loans / Other</label>
+                <input
+                  type="number"
+                  value={data.liabilities.loans}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => updateField('liabilities.loans', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div className="flex-between">
-              <span style={{ fontWeight: 600 }}>Current Nest Egg</span>
-              <span className="text-gradient-green" style={{ fontSize: '1.25rem', fontWeight: 800 }}>
+              <span style={{ fontWeight: 600 }}>Total Assets</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
                 ${totalAssets.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex-between">
+              <span style={{ fontWeight: 600 }}>Total Liabilities</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f87171' }}>
+                ${totalLiabilities.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex-between" style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+              <span style={{ fontWeight: 800 }}>Net Worth</span>
+              <span className="text-gradient-green" style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                ${netWorth.toLocaleString()}
               </span>
             </div>
             <div className="flex-between" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginTop: '0.25rem' }}>
