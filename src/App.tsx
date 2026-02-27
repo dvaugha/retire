@@ -194,6 +194,49 @@ function App() {
 
   const endingBalance = calculateEndingBalance();
 
+  // Budget Calibration Logic (Binary Search for Max Safe Withdrawal)
+  const calculateSafeWithdrawal = () => {
+    let low = 0;
+    let high = 50000; // Monthly upper bound
+    let maxSafe = 0;
+
+    for (let i = 0; i < 20; i++) {
+      const mid = (low + high) / 2;
+      let currentAssets = investableAssets;
+      const annualRoi = data.roiScenarios.mid / 100;
+      const annualInflation = data.inflationRate / 100;
+      let annualWithdrawal = mid * 12;
+
+      for (let j = 0; j < Math.max(0, data.retirementAge - data.age); j++) {
+        currentAssets = currentAssets * (1 + annualRoi);
+        annualWithdrawal = annualWithdrawal * (1 + annualInflation);
+      }
+
+      const yearsToCalculate = data.expectedLife - data.retirementAge;
+      let failed = false;
+      for (let j = 0; j < yearsToCalculate; j++) {
+        const currentAge = data.retirementAge + j;
+        let ssaIncome = 0;
+        if (currentAge >= data.ssaClaimingAge) {
+          const yearsOfCola = currentAge - data.age;
+          ssaIncome = currentSsaCheck * 12 * Math.pow(1 + annualInflation, yearsOfCola);
+        }
+        currentAssets = (currentAssets * (1 + annualRoi)) + ssaIncome - annualWithdrawal;
+        annualWithdrawal = annualWithdrawal * (1 + annualInflation);
+        if (currentAssets < 0) {
+          failed = true;
+          break;
+        }
+      }
+      if (failed) high = mid;
+      else { low = mid; maxSafe = mid; }
+    }
+    return maxSafe;
+  };
+
+  const safeMonthlyWithdrawal = calculateSafeWithdrawal();
+  const budgetAdjustment = safeMonthlyWithdrawal - data.monthlyWithdrawal;
+
   // Cumulative Cash Logic for SSA Strategy Lab
   const calculateCumulativeCash = (claimingAge: number, endAge: number) => {
     let total = 0;
@@ -632,6 +675,64 @@ function App() {
           <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             "You can't buy back your 60s with an extra check in your 80s."
           </div>
+        </section>
+
+        {/* Budget Optimization Section */}
+        <section className="glass-card" style={{
+          background: budgetAdjustment >= 0
+            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))'
+            : 'linear-gradient(135deg, rgba(248, 113, 113, 0.1), rgba(59, 130, 246, 0.1))',
+          border: `1px solid ${budgetAdjustment >= 0 ? 'var(--accent-secondary)' : '#f87171'}`
+        }}>
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.1rem' }}>Budget Optimization</h2>
+            <div style={{ padding: '4px 12px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', fontSize: '0.7rem' }}>
+              Mid Return Analysis
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+              {budgetAdjustment >= 0
+                ? "You could safely INCREASE your monthly spend by:"
+                : "To reach your goal, you should DECREASE monthly spend by:"}
+            </p>
+            <span style={{
+              fontSize: '2rem',
+              fontWeight: 800,
+              color: budgetAdjustment >= 0 ? 'var(--accent-secondary)' : '#f87171'
+            }}>
+              ${Math.abs(Math.floor(budgetAdjustment)).toLocaleString()}
+              <span style={{ fontSize: '1rem', fontWeight: 500 }}> /mo</span>
+            </span>
+          </div>
+
+          <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', fontSize: '0.85rem' }}>
+            <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
+              <span>Maximum Safe Withdrawal:</span>
+              <span style={{ fontWeight: 700 }}>${Math.floor(safeMonthlyWithdrawal).toLocaleString()}</span>
+            </div>
+            <div className="flex-between">
+              <span>Current Planned Withdrawal:</span>
+              <span style={{ fontWeight: 700 }}>${Math.floor(data.monthlyWithdrawal).toLocaleString()}</span>
+            </div>
+          </div>
+
+          <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: '1.4' }}>
+            {budgetAdjustment >= 0
+              ? "Your current assets are outperforming your withdrawal rate. You have significant lifestyle upside."
+              : "⚠️ Your current withdrawal rate is projected to exhaust your assets before your target age."}
+          </p>
+
+          {budgetAdjustment > 500 && (
+            <button
+              onClick={() => updateField('monthlyWithdrawal', Math.floor(safeMonthlyWithdrawal))}
+              className="btn-primary"
+              style={{ marginTop: '1.5rem', background: 'var(--accent-secondary)' }}
+            >
+              Apply Optimized Budget
+            </button>
+          )}
         </section>
 
         {/* Footer */}
